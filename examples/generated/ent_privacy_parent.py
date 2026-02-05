@@ -6,7 +6,6 @@ from __future__ import annotations
 import logging
 from entpy import (
     db,
-    Ent,
     generate_uuid,
     Action,
     Decision,
@@ -14,49 +13,19 @@ from entpy import (
 from uuid import UUID
 from datetime import datetime, UTC
 from evc import ExampleViewerContext
-from .ent_model import EntModel
 from ent_privacy_parent_schema import EntPrivacyParentSchema
 from entpy import Field
 from entpy import PrivacyError
-from entpy.framework.ent import EntObjectBase
 from entpy.framework.query import EntObjectQuery
-from entpy.model import APIEntity
-from functools import cache
-from privacy import PrivacyMixin
-from pydantic import Field as APIField
 from sentinels import NOTHING, Sentinel  # type: ignore[import-untyped]
-from sqlalchemy import String
-from sqlalchemy.orm import Mapped, mapped_column
-from typing import TYPE_CHECKING
+from .ent_privacy_parent_models import EntPrivacyParentGen, EntPrivacyParentModel
+from .ent_privacy_parent_models import EntPrivacyParentAPIModel  # noqa: F401
 
 
 privacy_logger = logging.getLogger("entpy.privacy")
 
 
-class EntPrivacyParentModel(EntModel):
-    __tablename__ = "privacy_parent"
-
-    name: Mapped[str] = mapped_column(String(100), nullable=False)
-
-
-class EntPrivacyParentAPIModel(APIEntity):
-    name: str = APIField(..., examples=["Privacy Parent"])
-
-
-class EntPrivacyParent(
-    PrivacyMixin, EntObjectBase[ExampleViewerContext, EntPrivacyParentModel]
-):
-    m = EntPrivacyParentModel
-    schema = EntPrivacyParentSchema()
-
-    if TYPE_CHECKING:
-        name: str
-
-    @classmethod
-    @cache
-    def _get_edge_type(cls, edge_name: str) -> tuple[type[Ent], bool]:
-        return super()._get_edge_type(edge_name)
-
+class EntPrivacyParent(EntPrivacyParentGen):
     @classmethod
     def query(cls, vc: ExampleViewerContext) -> EntPrivacyParentQuery:
         return EntPrivacyParentQuery(vc=vc)

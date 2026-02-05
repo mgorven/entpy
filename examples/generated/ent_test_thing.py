@@ -5,136 +5,21 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
 from datetime import datetime
-from functools import cache
-from typing import Self, TYPE_CHECKING
 from uuid import UUID
 
 from sentinels import Sentinel, NOTHING  # type: ignore[import-untyped]
 
-from .ent_model import EntModel
 from ent_test_thing_pattern import ThingStatus
-from entpy import Ent
-from entpy.framework.ent import EntPatternBase
 from entpy.framework.query import EntPatternQuery
-from entpy.model import APIEntity
 from evc import ExampleViewerContext
-from pydantic import Field as APIField
-from sqlalchemy import Enum as DBEnum
-from sqlalchemy import ForeignKey
-from sqlalchemy import String
-from sqlalchemy import UUID as DBUUID
-from sqlalchemy.orm import Mapped, mapped_column
+from .ent_test_thing_models import IEntTestThingGen, EntTestThingModel
+from .ent_test_thing_models import EntTestThingAPIModel  # noqa: F401
 
 
-if TYPE_CHECKING:
-    from .ent_test_object5 import EntTestObject5APIModel
-    from .ent_test_object5 import EntTestObject5
-
-
-if TYPE_CHECKING:
-    from entpy import Ent
-
-
-class EntTestThingModel(EntModel):
-    __abstract__ = True
-
-    a_good_thing: Mapped[str] = mapped_column(String(100), nullable=False)
-    obj5_id: Mapped[UUID] = mapped_column(
-        DBUUID(),
-        ForeignKey("test_object5.id", deferrable=True, initially="DEFERRED"),
-        nullable=False,
-    )
-    a_pattern_validated_field: Mapped[str | None] = mapped_column(
-        String(100), nullable=True
-    )
-    idempotency_key: Mapped[UUID | None] = mapped_column(DBUUID(), nullable=True)
-    obj5_opt_id: Mapped[UUID | None] = mapped_column(
-        DBUUID(),
-        ForeignKey("test_object5.id", deferrable=True, initially="DEFERRED"),
-        nullable=True,
-    )
-    thing_status: Mapped[ThingStatus | None] = mapped_column(
-        DBEnum(ThingStatus, native_enum=True), nullable=True
-    )
-
-
-class EntTestThingAPIModel(APIEntity):
-    a_good_thing: str = APIField(..., examples=["A sunny day"])
-    obj5: "EntTestObject5APIModel" = APIField(...)
-    a_pattern_validated_field: str | None = APIField(None, examples=["vdurmont"])
-    idempotency_key: UUID | None = APIField(None)
-    obj5_opt: "EntTestObject5APIModel | None" = APIField(None)
-    thing_status: ThingStatus | None = APIField(None)
-
-
-class IEntTestThing(EntPatternBase[ExampleViewerContext, EntTestThingModel]):
-    m = EntTestThingModel
-
-    if TYPE_CHECKING:
-        a_good_thing: str
-        obj5_id: UUID
-        a_pattern_validated_field: str | None
-        idempotency_key: UUID | None
-        obj5_opt_id: UUID | None
-        thing_status: ThingStatus | None
-
-        @classmethod
-        async def gen_from_idempotency_key(
-            cls,
-            vc: ExampleViewerContext,
-            idempotency_key: UUID,
-            for_update: bool = False,
-        ) -> Self | None:
-            pass
-
-        @classmethod
-        async def genx_from_idempotency_key(
-            cls,
-            vc: ExampleViewerContext,
-            idempotency_key: UUID,
-            for_update: bool = False,
-        ) -> Self:
-            pass
-
-        async def gen_obj5(self) -> "EntTestObject5":
-            pass
-
-        async def gen_obj5_opt(self) -> "EntTestObject5" | None:
-            pass
-
-    @classmethod
-    @cache
-    def _get_edge_type(cls, edge_name: str) -> tuple[type[Ent], bool]:
-        match edge_name:
-            case "obj5":
-                from .ent_test_object5 import EntTestObject5
-
-                return (EntTestObject5, False)
-            case "obj5_opt":
-                from .ent_test_object5 import EntTestObject5
-
-                return (EntTestObject5, True)
-
-        return super()._get_edge_type(edge_name)
-
+class IEntTestThing(IEntTestThingGen):
     @classmethod
     def query(cls, vc: ExampleViewerContext) -> IEntTestThingQuery:
         return IEntTestThingQuery(vc=vc)
-
-    @classmethod
-    @cache
-    def _get_child_type(cls, uuid_type: bytes) -> type[IEntTestThing]:
-        match uuid_type:
-            case b"\x7c\x9a":
-                from .ent_test_object2 import EntTestObject2
-
-                return EntTestObject2
-            case b"\x23\x1c":
-                from .ent_test_object import EntTestObject
-
-                return EntTestObject
-
-        raise ValueError(f"Unknown UUID type for IEntTestThing: {uuid_type.hex()}")
 
 
 class IEntTestThingQuery(

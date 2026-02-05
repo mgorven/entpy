@@ -6,7 +6,6 @@ from __future__ import annotations
 import logging
 from entpy import (
     db,
-    Ent,
     generate_uuid,
     Action,
     Decision,
@@ -14,11 +13,7 @@ from entpy import (
 )
 from uuid import UUID
 from datetime import datetime, UTC
-from typing import Self
 from evc import ExampleViewerContext
-from .ent_test_thing import EntTestThingAPIModel
-from .ent_test_thing import EntTestThingModel
-from .ent_test_thing import IEntTestThing
 from .ent_test_thing import IEntTestThingMutatorDeletionAction
 from .ent_test_thing import IEntTestThingMutatorUpdateAction
 from datetime import date
@@ -29,289 +24,16 @@ from ent_test_object_schema import Status
 from ent_test_thing_pattern import ThingStatus
 from entpy import Field, FieldWithDynamicExample
 from entpy import PrivacyError
-from entpy.framework.ent import EntObjectBase
 from entpy.framework.query import EntObjectQuery
-from entpy.types import DateTime
-from functools import cache
-from privacy import PrivacyMixin
-from pydantic import AwareDatetime
-from pydantic import Field as APIField
 from sentinels import NOTHING, Sentinel  # type: ignore[import-untyped]
-from sqlalchemy import Boolean
-from sqlalchemy import Date
-from sqlalchemy import Enum as DBEnum
-from sqlalchemy import ForeignKey
-from sqlalchemy import Index, text
-from sqlalchemy import Integer
-from sqlalchemy import Interval
-from sqlalchemy import JSON
-from sqlalchemy import String
-from sqlalchemy import Text
-from sqlalchemy import Time
-from sqlalchemy import UUID as DBUUID
-from sqlalchemy.dialects.postgresql import JSONB
-from sqlalchemy.orm import Mapped, mapped_column
-from sqlalchemy.orm import relationship
-from typing import TYPE_CHECKING
+from .ent_test_object_models import EntTestObjectGen, EntTestObjectModel
+from .ent_test_object_models import EntTestObjectAPIModel  # noqa: F401
 
-if TYPE_CHECKING:
-    from .ent_test_object5 import EntTestObject5Model
-    from .ent_test_sub_object import EntTestSubObjectModel
-    from .ent_test_sub_object import EntTestSubObjectAPIModel
-    from .ent_test_thing import EntTestThingAPIModel
-    from .ent_test_sub_object import EntTestSubObject
-    from .ent_test_thing import IEntTestThing
 
 privacy_logger = logging.getLogger("entpy.privacy")
 
 
-class EntTestObjectModel(EntTestThingModel):
-    __tablename__ = "test_object"
-
-    firstname: Mapped[str] = mapped_column(String(100), nullable=False)
-    required_sub_object_id: Mapped[UUID] = mapped_column(
-        DBUUID(),
-        ForeignKey("test_sub_object.id", deferrable=True, initially="DEFERRED"),
-        nullable=False,
-    )
-    username: Mapped[str] = mapped_column(String(100), nullable=False)
-    lastname: Mapped[str | None] = mapped_column(
-        String(100), nullable=True, server_default="Doe"
-    )
-    retry_count: Mapped[int | None] = mapped_column(
-        Integer(), nullable=True, server_default="0"
-    )
-    sadness: Mapped[Status | None] = mapped_column(
-        DBEnum(Status, native_enum=True), nullable=True, server_default=Status.SAD.value
-    )
-    city: Mapped[str | None] = mapped_column(String(100), nullable=True)
-    context: Mapped[str | None] = mapped_column(Text(), nullable=True)
-    correlation_id: Mapped[UUID | None] = mapped_column(DBUUID(), nullable=True)
-    dob: Mapped[date | None] = mapped_column(Date(), nullable=True)
-    duration: Mapped[timedelta | None] = mapped_column(Interval(), nullable=True)
-    end_time: Mapped[time | None] = mapped_column(Time(), nullable=True)
-    is_it_true: Mapped[bool | None] = mapped_column(Boolean(), nullable=True)
-    optional_sub_object_id: Mapped[UUID | None] = mapped_column(
-        DBUUID(),
-        ForeignKey("test_sub_object.id", deferrable=True, initially="DEFERRED"),
-        nullable=True,
-    )
-    optional_sub_object_no_ex_id: Mapped[UUID | None] = mapped_column(
-        DBUUID(),
-        ForeignKey("test_sub_object.id", deferrable=True, initially="DEFERRED"),
-        nullable=True,
-    )
-    self_id: Mapped[UUID | None] = mapped_column(
-        DBUUID(),
-        ForeignKey("test_object.id", deferrable=True, initially="DEFERRED"),
-        nullable=True,
-    )
-    some_json: Mapped[list[str] | None] = mapped_column(
-        JSON().with_variant(JSONB(), "postgresql"), nullable=True
-    )
-    some_pattern_id: Mapped[UUID | None] = mapped_column(DBUUID(), nullable=True)
-    start_time: Mapped[time | None] = mapped_column(Time(), nullable=True)
-    status: Mapped[Status | None] = mapped_column(
-        DBEnum(Status, native_enum=True), nullable=True
-    )
-    status_code: Mapped[int | None] = mapped_column(Integer(), nullable=True)
-    trace_id: Mapped[UUID | None] = mapped_column(DBUUID(), nullable=True)
-    validated_field: Mapped[str | None] = mapped_column(String(100), nullable=True)
-    when_is_it_cool: Mapped[datetime | None] = mapped_column(DateTime(), nullable=True)
-    obj5: Mapped["EntTestObject5Model"] = relationship(
-        "EntTestObject5Model",
-        primaryjoin="EntTestObjectModel.obj5_id == EntTestObject5Model.id",
-    )
-    required_sub_object: Mapped["EntTestSubObjectModel"] = relationship(
-        "EntTestSubObjectModel",
-        primaryjoin="EntTestObjectModel.required_sub_object_id == EntTestSubObjectModel.id",
-    )
-    obj5_opt: Mapped["EntTestObject5Model"] = relationship(
-        "EntTestObject5Model",
-        primaryjoin="EntTestObjectModel.obj5_opt_id == EntTestObject5Model.id",
-    )
-    optional_sub_object: Mapped["EntTestSubObjectModel"] = relationship(
-        "EntTestSubObjectModel",
-        primaryjoin="EntTestObjectModel.optional_sub_object_id == EntTestSubObjectModel.id",
-    )
-    optional_sub_object_no_ex: Mapped["EntTestSubObjectModel"] = relationship(
-        "EntTestSubObjectModel",
-        primaryjoin="EntTestObjectModel.optional_sub_object_no_ex_id == EntTestSubObjectModel.id",
-    )
-    self: Mapped["EntTestObjectModel"] = relationship(
-        "EntTestObjectModel",
-        primaryjoin="EntTestObjectModel.self_id == EntTestObjectModel.id",
-    )
-
-
-Index(
-    None,
-    EntTestObjectModel.trace_id,
-    EntTestObjectModel.status_code,
-    unique=True,
-    postgresql_where=text("soft_deleted_at IS NULL"),
-    sqlite_where=text("soft_deleted_at IS NULL"),
-)
-Index(
-    None,
-    EntTestObjectModel.status,
-    EntTestObjectModel.sadness,
-    postgresql_where=text("soft_deleted_at IS NULL"),
-    sqlite_where=text("soft_deleted_at IS NULL"),
-)
-Index(
-    None,
-    EntTestObjectModel.validated_field,
-    postgresql_where=EntTestObjectModel.is_it_true.is_(True),
-    sqlite_where=EntTestObjectModel.is_it_true.is_(True),
-)
-Index(
-    None,
-    EntTestObjectModel.firstname,
-    postgresql_where=text("soft_deleted_at IS NULL"),
-    sqlite_where=text("soft_deleted_at IS NULL"),
-)
-Index(
-    None,
-    EntTestObjectModel.username,
-    unique=True,
-    postgresql_where=text("soft_deleted_at IS NULL"),
-    sqlite_where=text("soft_deleted_at IS NULL"),
-)
-Index(
-    None,
-    EntTestObjectModel.idempotency_key,
-    unique=True,
-    postgresql_where=text("soft_deleted_at IS NULL"),
-    sqlite_where=text("soft_deleted_at IS NULL"),
-)
-
-
-class EntTestObjectAPIModel(EntTestThingAPIModel):
-    firstname: str = APIField(..., examples=["Vincent"])
-    required_sub_object: "EntTestSubObjectAPIModel" = APIField(...)
-    username: str = APIField(
-        ..., description="This is the username that you will use on the platform."
-    )
-    lastname: str | None = APIField("Doe")
-    retry_count: int | None = APIField(0)
-    sadness: Status | None = APIField(Status.SAD)
-    context: str | None = APIField(None, examples=["This is some good context."])
-    correlation_id: UUID | None = APIField(None)
-    dob: date | None = APIField(None, examples=[date.fromisoformat("2000-01-01")])
-    duration: timedelta | None = APIField(None, examples=[timedelta(seconds=123.456)])
-    end_time: time | None = APIField(None)
-    is_it_true: bool | None = APIField(None, examples=[False])
-    optional_sub_object: "EntTestSubObjectAPIModel | None" = APIField(None)
-    optional_sub_object_no_ex: "EntTestSubObjectAPIModel | None" = APIField(None)
-    self: "EntTestObjectAPIModel | None" = APIField(None)
-    some_json: list[str] | None = APIField(None, examples=[["hello", "world"]])
-    some_pattern: "EntTestThingAPIModel | None" = APIField(None)
-    start_time: time | None = APIField(None, examples=[time.fromisoformat("09:30:00")])
-    status: Status | None = APIField(None, examples=[Status.HAPPY])
-    status_code: int | None = APIField(None, examples=[404])
-    trace_id: UUID | None = APIField(None)
-    validated_field: str | None = APIField(None)
-    when_is_it_cool: AwareDatetime | None = APIField(None)
-
-
-class EntTestObject(
-    PrivacyMixin, EntObjectBase[ExampleViewerContext, EntTestObjectModel], IEntTestThing
-):
-    """
-    This is an object we use to test all the ent framework features!
-    """
-
-    m = EntTestObjectModel
-    schema = EntTestObjectSchema()
-
-    if TYPE_CHECKING:
-        a_good_thing: str
-        firstname: str
-        obj5_id: UUID
-        required_sub_object_id: UUID
-        username: str
-        """
-        This is the username that you will use on the platform.
-        """
-        lastname: str | None
-        retry_count: int | None
-        sadness: Status | None
-        a_pattern_validated_field: str | None
-        city: str | None
-        context: str | None
-        correlation_id: UUID | None
-        dob: date | None
-        duration: timedelta | None
-        end_time: time | None
-        idempotency_key: UUID | None
-        is_it_true: bool | None
-        obj5_opt_id: UUID | None
-        optional_sub_object_id: UUID | None
-        optional_sub_object_no_ex_id: UUID | None
-        self_id: UUID | None
-        some_json: list[str] | None
-        some_pattern_id: UUID | None
-        start_time: time | None
-        status: Status | None
-        status_code: int | None
-        thing_status: ThingStatus | None
-        trace_id: UUID | None
-        validated_field: str | None
-        when_is_it_cool: datetime | None
-
-        @classmethod
-        async def gen_from_username(
-            cls, vc: ExampleViewerContext, username: str, for_update: bool = False
-        ) -> Self | None:
-            pass
-
-        @classmethod
-        async def genx_from_username(
-            cls, vc: ExampleViewerContext, username: str, for_update: bool = False
-        ) -> Self:
-            pass
-
-        async def gen_required_sub_object(self) -> "EntTestSubObject":
-            pass
-
-        async def gen_optional_sub_object(self) -> "EntTestSubObject" | None:
-            pass
-
-        async def gen_optional_sub_object_no_ex(self) -> "EntTestSubObject" | None:
-            pass
-
-        async def gen_self(self) -> "EntTestObject" | None:
-            pass
-
-        async def gen_some_pattern(self) -> "IEntTestThing" | None:
-            pass
-
-    @classmethod
-    @cache
-    def _get_edge_type(cls, edge_name: str) -> tuple[type[Ent], bool]:
-        match edge_name:
-            case "required_sub_object":
-                from .ent_test_sub_object import EntTestSubObject
-
-                return (EntTestSubObject, False)
-            case "optional_sub_object":
-                from .ent_test_sub_object import EntTestSubObject
-
-                return (EntTestSubObject, True)
-            case "optional_sub_object_no_ex":
-                from .ent_test_sub_object import EntTestSubObject
-
-                return (EntTestSubObject, True)
-            case "self":
-                return (EntTestObject, True)
-            case "some_pattern":
-                from .ent_test_thing import IEntTestThing
-
-                return (IEntTestThing, True)
-
-        return super()._get_edge_type(edge_name)
-
+class EntTestObject(EntTestObjectGen):
     @classmethod
     def query(cls, vc: ExampleViewerContext) -> EntTestObjectQuery:  # type: ignore[override]
         return EntTestObjectQuery(vc=vc)

@@ -5,54 +5,18 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
 from datetime import datetime
-from functools import cache
-from typing import TYPE_CHECKING
 
 
-from .ent_model import EntModel
-from entpy import Ent
-from entpy.framework.ent import EntPatternBase
 from entpy.framework.query import EntPatternQuery
-from entpy.model import APIEntity
 from evc import ExampleViewerContext
-
-if TYPE_CHECKING:
-    from entpy import Ent
-
-
-class EntTestPatternModel(EntModel):
-    __abstract__ = True
+from .ent_test_pattern_models import IEntTestPatternGen, EntTestPatternModel
+from .ent_test_pattern_models import EntTestPatternAPIModel  # noqa: F401
 
 
-class EntTestPatternAPIModel(APIEntity):
-    pass
-
-
-class IEntTestPattern(EntPatternBase[ExampleViewerContext, EntTestPatternModel]):
-    m = EntTestPatternModel
-
-    if TYPE_CHECKING:
-        pass
-
-    @classmethod
-    @cache
-    def _get_edge_type(cls, edge_name: str) -> tuple[type[Ent], bool]:
-        return super()._get_edge_type(edge_name)
-
+class IEntTestPattern(IEntTestPatternGen):
     @classmethod
     def query(cls, vc: ExampleViewerContext) -> IEntTestPatternQuery:
         return IEntTestPatternQuery(vc=vc)
-
-    @classmethod
-    @cache
-    def _get_child_type(cls, uuid_type: bytes) -> type[IEntTestPattern]:
-        match uuid_type:
-            case b"\x7c\x9a":
-                from .ent_test_object2 import EntTestObject2
-
-                return EntTestObject2
-
-        raise ValueError(f"Unknown UUID type for IEntTestPattern: {uuid_type.hex()}")
 
 
 class IEntTestPatternQuery(

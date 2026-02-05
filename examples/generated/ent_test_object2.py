@@ -6,7 +6,6 @@ from __future__ import annotations
 import logging
 from entpy import (
     db,
-    Ent,
     generate_uuid,
     Action,
     Decision,
@@ -15,92 +14,25 @@ from entpy import (
 from uuid import UUID
 from datetime import datetime, UTC
 from evc import ExampleViewerContext
-from .ent_test_pattern import EntTestPatternAPIModel
-from .ent_test_pattern import EntTestPatternModel
-from .ent_test_pattern import IEntTestPattern
 from .ent_test_pattern import IEntTestPatternMutatorDeletionAction
 from .ent_test_pattern import IEntTestPatternMutatorUpdateAction
-from .ent_test_thing import EntTestThingAPIModel
-from .ent_test_thing import EntTestThingModel
-from .ent_test_thing import IEntTestThing
 from .ent_test_thing import IEntTestThingMutatorDeletionAction
 from .ent_test_thing import IEntTestThingMutatorUpdateAction
+from ent_test_object2_mixin import EntTestObject2Mixin
 from ent_test_object2_schema import EntTestObject2Schema
 from ent_test_thing_pattern import ThingStatus
 from entpy import Field, FieldWithDynamicExample
 from entpy import PrivacyError
-from entpy.framework.ent import EntObjectBase
 from entpy.framework.query import EntObjectQuery
-from functools import cache
-from privacy import PrivacyMixin
-from pydantic import Field as APIField
 from sentinels import NOTHING, Sentinel  # type: ignore[import-untyped]
-from sqlalchemy import Index, text
-from sqlalchemy import String
-from sqlalchemy.orm import Mapped, mapped_column
-from sqlalchemy.orm import relationship
-from typing import TYPE_CHECKING
+from .ent_test_object2_models import EntTestObject2Gen, EntTestObject2Model
+from .ent_test_object2_models import EntTestObject2APIModel  # noqa: F401
 
-if TYPE_CHECKING:
-    from .ent_test_object5 import EntTestObject5Model
 
 privacy_logger = logging.getLogger("entpy.privacy")
 
 
-class EntTestObject2Model(EntTestThingModel, EntTestPatternModel):
-    __tablename__ = "test_object2"
-
-    some_field: Mapped[str | None] = mapped_column(String(100), nullable=True)
-    obj5: Mapped["EntTestObject5Model"] = relationship(
-        "EntTestObject5Model",
-        primaryjoin="EntTestObject2Model.obj5_id == EntTestObject5Model.id",
-    )
-    obj5_opt: Mapped["EntTestObject5Model"] = relationship(
-        "EntTestObject5Model",
-        primaryjoin="EntTestObject2Model.obj5_opt_id == EntTestObject5Model.id",
-    )
-
-
-Index(
-    None,
-    EntTestObject2Model.idempotency_key,
-    unique=True,
-    postgresql_where=text("soft_deleted_at IS NULL"),
-    sqlite_where=text("soft_deleted_at IS NULL"),
-)
-
-
-class EntTestObject2APIModel(EntTestThingAPIModel, EntTestPatternAPIModel):
-    some_field: str | None = APIField(None)
-
-
-class EntTestObject2(
-    PrivacyMixin,
-    EntObjectBase[ExampleViewerContext, EntTestObject2Model],
-    IEntTestThing,
-    IEntTestPattern,
-):
-    m = EntTestObject2Model
-    schema = EntTestObject2Schema()
-
-    if TYPE_CHECKING:
-        a_good_thing: str
-        obj5_id: UUID
-        a_pattern_validated_field: str | None
-        idempotency_key: UUID | None
-        obj5_opt_id: UUID | None
-        some_field: str | None
-        thing_status: ThingStatus | None
-
-    @classmethod
-    @cache
-    def _get_edge_type(cls, edge_name: str) -> tuple[type[Ent], bool]:
-        return super()._get_edge_type(edge_name)
-
-    @classmethod
-    def _get_child_type(cls, uuid_type: bytes) -> type[EntTestObject2]:  # type: ignore[override]
-        raise NotImplementedError("get_child_type() should only be called on patterns")
-
+class EntTestObject2(EntTestObject2Mixin, EntTestObject2Gen):
     @classmethod
     def query(cls, vc: ExampleViewerContext) -> EntTestObject2Query:  # type: ignore[override]
         return EntTestObject2Query(vc=vc)

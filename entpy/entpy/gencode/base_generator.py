@@ -1,4 +1,12 @@
-from entpy import DateField, EdgeField, IntervalField, Pattern, Schema, TimeField
+from entpy import (
+    DateField,
+    EdgeField,
+    EnumField,
+    IntervalField,
+    Pattern,
+    Schema,
+    TimeField,
+)
 from entpy.framework.descriptor import Descriptor
 from entpy.gencode.generated_content import GeneratedContent
 from entpy.gencode.utils import (
@@ -45,6 +53,9 @@ def generate(
     attributes = ""
     if isinstance(descriptor, Schema):
         attributes = "    schema = " + base_name + "Schema()"
+        imports.append(
+            f"from {descriptor.__class__.__module__} import {descriptor.__class__.__name__}"
+        )
 
     for pattern in descriptor.get_patterns():
         pattern_base_name = pattern.__class__.__name__.removesuffix("Pattern")
@@ -56,7 +67,7 @@ def generate(
     # Make the type checker happy for ents which implement multiple patterns
     if len(descriptor.get_patterns()) > 1:
         child_types = f"""@classmethod
-    def _get_child_type(cls, uuid_type: bytes) -> type[{base_name}]:  # type: ignore[override]
+    def _get_child_type(cls, uuid_type: bytes) -> type[{base_name}Gen]:  # type: ignore[override]
         raise NotImplementedError("get_child_type() should only be called on patterns")
     """
 
@@ -65,7 +76,7 @@ def generate(
         type_checking_imports=fields.type_checking_imports
         + edge_gens.type_checking_imports,
         code=f"""
-class {i}{base_name}({extends}):{get_description(descriptor)}
+class {i}{base_name}Gen({extends}):{get_description(descriptor)}
     m = {base_name}Model
 {attributes}
 
@@ -83,26 +94,32 @@ class {i}{base_name}({extends}):{get_description(descriptor)}
         return super()._get_edge_type(edge_name)
 
     {child_types}
-
-    @classmethod
-    def query(cls, vc: {vc.name}) -> {i}{base_name}Query:  {"# type: ignore[override]" if descriptor.get_patterns() else ""}
-        return {i}{base_name}Query(vc=vc)
 """,
     )
+
+
+def generate_field_imports(descriptor: Descriptor) -> list[str]:
+    imports = ["from typing import Any, TYPE_CHECKING"]
+    for field in descriptor.get_all_fields():
+        if isinstance(field, DateField):
+            imports.append("from datetime import date")
+        elif isinstance(field, TimeField):
+            imports.append("from datetime import time")
+        elif isinstance(field, IntervalField):
+            imports.append("from datetime import timedelta")
+        elif isinstance(field, EnumField):
+            module = field.enum_class.__module__
+            type_name = field.enum_class.__name__
+            imports.append(f"from {module} import {type_name}")
+
+    return imports
 
 
 def _generate_fields(schema: Descriptor) -> GeneratedContent:
     fields = schema.get_all_fields()
     field_code = ""
-    imports = ["from typing import Any, TYPE_CHECKING"]
 
     for field in fields:
-        if isinstance(field, DateField):
-            imports.append("from datetime import date")
-        if isinstance(field, TimeField):
-            imports.append("from datetime import time")
-        if isinstance(field, IntervalField):
-            imports.append("from datetime import timedelta")
         accessor_type = field.get_python_type() + (" | None" if field.nullable else "")
         field_code += f"        {field.name}: {accessor_type}\n"
         if field.description:
@@ -111,7 +128,7 @@ def _generate_fields(schema: Descriptor) -> GeneratedContent:
         \"\"\"\n"""
 
     return GeneratedContent(
-        imports=imports,
+        imports=generate_field_imports(schema),
         code=field_code,
     )
 
@@ -128,18 +145,14 @@ def _generate_edge_gens(
         # If the field is an edge, we want to generate a utility function to
         # load the edge directly
         if isinstance(field, EdgeField):
-            load = ""
-            if field.edge_class != schema.__class__:
-                module = "." + to_snake_case(
-                    field.edge_class.__name__.removesuffix("Schema").removesuffix(
-                        "Pattern"
-                    )
-                )
-                # We import the edge type locally to avoid circular imports
-                type_checking_imports.append(
-                    f"from {module} import {field.get_edge_type()}"
-                )
-                load = f"from {module} import {field.get_edge_type()}\n        "
+            module = "." + to_snake_case(
+                field.edge_class.__name__.removesuffix("Schema").removesuffix("Pattern")
+            )
+            # We import the edge type locally to avoid circular imports
+            type_checking_imports.append(
+                f"from {module} import {field.get_edge_type()}"
+            )
+            load = f"from {module} import {field.get_edge_type()}\n        "
             type_stubs += f"""
         async def gen_{field.original_name}(self) -> "{field.get_edge_type()}"{" | None" if field.nullable else ""}:
             pass

@@ -6,7 +6,6 @@ from __future__ import annotations
 import logging
 from entpy import (
     db,
-    Ent,
     generate_uuid,
     Action,
     Decision,
@@ -14,76 +13,22 @@ from entpy import (
 from uuid import UUID
 from datetime import datetime, UTC
 from evc import ExampleViewerContext
-from .ent_model import EntModel
 from ent_delegate_then_rule_schema import EntDelegateThenRuleSchema
 from entpy import Field
 from entpy import PrivacyError
-from entpy.framework.ent import EntObjectBase
 from entpy.framework.query import EntObjectQuery
-from entpy.model import APIEntity
-from functools import cache
-from privacy import PrivacyMixin
-from pydantic import Field as APIField
 from sentinels import NOTHING, Sentinel  # type: ignore[import-untyped]
-from sqlalchemy import ForeignKey
-from sqlalchemy import String
-from sqlalchemy import UUID as DBUUID
-from sqlalchemy.orm import Mapped, mapped_column
-from sqlalchemy.orm import relationship
-from typing import TYPE_CHECKING
+from .ent_delegate_then_rule_models import (
+    EntDelegateThenRuleGen,
+    EntDelegateThenRuleModel,
+)
+from .ent_delegate_then_rule_models import EntDelegateThenRuleAPIModel  # noqa: F401
 
-if TYPE_CHECKING:
-    from .ent_privacy_parent import EntPrivacyParentModel
-    from .ent_privacy_parent import EntPrivacyParentAPIModel
-    from .ent_privacy_parent import EntPrivacyParent
 
 privacy_logger = logging.getLogger("entpy.privacy")
 
 
-class EntDelegateThenRuleModel(EntModel):
-    __tablename__ = "delegate_then_rule"
-
-    name: Mapped[str] = mapped_column(String(100), nullable=False)
-    privacy_parent_id: Mapped[UUID] = mapped_column(
-        DBUUID(),
-        ForeignKey("privacy_parent.id", deferrable=True, initially="DEFERRED"),
-        nullable=False,
-    )
-    privacy_parent: Mapped["EntPrivacyParentModel"] = relationship(
-        "EntPrivacyParentModel",
-        primaryjoin="EntDelegateThenRuleModel.privacy_parent_id == EntPrivacyParentModel.id",
-    )
-
-
-class EntDelegateThenRuleAPIModel(APIEntity):
-    name: str = APIField(..., examples=["Delegate Then Rule Entity"])
-    privacy_parent: "EntPrivacyParentAPIModel" = APIField(...)
-
-
-class EntDelegateThenRule(
-    PrivacyMixin, EntObjectBase[ExampleViewerContext, EntDelegateThenRuleModel]
-):
-    m = EntDelegateThenRuleModel
-    schema = EntDelegateThenRuleSchema()
-
-    if TYPE_CHECKING:
-        name: str
-        privacy_parent_id: UUID
-
-        async def gen_privacy_parent(self) -> "EntPrivacyParent":
-            pass
-
-    @classmethod
-    @cache
-    def _get_edge_type(cls, edge_name: str) -> tuple[type[Ent], bool]:
-        match edge_name:
-            case "privacy_parent":
-                from .ent_privacy_parent import EntPrivacyParent
-
-                return (EntPrivacyParent, False)
-
-        return super()._get_edge_type(edge_name)
-
+class EntDelegateThenRule(EntDelegateThenRuleGen):
     @classmethod
     def query(cls, vc: ExampleViewerContext) -> EntDelegateThenRuleQuery:
         return EntDelegateThenRuleQuery(vc=vc)

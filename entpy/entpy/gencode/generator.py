@@ -4,8 +4,10 @@ from pathlib import Path
 
 from entpy import Pattern, Schema
 from entpy.gencode.model_base_template import generate as generate_base_model
-from entpy.gencode.pattern_generator import generate as generate_pattern
-from entpy.gencode.schema_generator import generate as generate_schema
+from entpy.gencode.pattern_generator import generate_models as generate_pattern_models
+from entpy.gencode.pattern_generator import generate_utils as generate_pattern_utils
+from entpy.gencode.schema_generator import generate_models as generate_schema_models
+from entpy.gencode.schema_generator import generate_utils as generate_schema_utils
 from entpy.gencode.utils import ImportedObject
 from entpy.gencode.view_generator import generate as generate_view
 
@@ -58,17 +60,28 @@ def run(
                 f"from .{descriptor_output_path.stem} import {base_name}Example\n"
             )
             examples_list += f"    {base_name}Example,\n"
-            code = generate_schema(
+            models_code = generate_schema_models(
                 schema_class=descriptor_class,
                 vc=vc,
                 threshold_to_stop_loading_ents_for_count=threshold_to_stop_loading_ents_for_count,
                 privacy_mixin=privacy_mixin,
             )
+            utils_code = generate_schema_utils(
+                schema_class=descriptor_class,
+                vc=vc,
+                threshold_to_stop_loading_ents_for_count=threshold_to_stop_loading_ents_for_count,
+            )
         elif issubclass(descriptor_class, Pattern):
             children = get_children_schema_classes(
                 pattern_class=descriptor_class,
             )
-            code = generate_pattern(
+            models_code = generate_pattern_models(
+                pattern_class=descriptor_class,
+                children_schema_classes=children,
+                vc=vc,
+                threshold_to_stop_loading_ents_for_count=threshold_to_stop_loading_ents_for_count,
+            )
+            utils_code = generate_pattern_utils(
                 pattern_class=descriptor_class,
                 children_schema_classes=children,
                 vc=vc,
@@ -93,7 +106,11 @@ def run(
         else:
             raise TypeError(f"Unknown descriptor type: {descriptor_class}")
 
-        _write_file(descriptor_output_path, code)
+        _write_file(
+            descriptor_output_path.with_stem(f"{descriptor_output_path.stem}_models"),
+            models_code,
+        )
+        _write_file(descriptor_output_path, utils_code)
 
     models_list_code = f"""
 from entpy import Ent

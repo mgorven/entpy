@@ -6,7 +6,6 @@ from __future__ import annotations
 import logging
 from entpy import (
     db,
-    Ent,
     generate_uuid,
     Action,
     Decision,
@@ -14,49 +13,19 @@ from entpy import (
 from uuid import UUID
 from datetime import datetime, UTC
 from evc import ExampleViewerContext
-from .ent_model import EntModel
 from ent_test_sub_object_schema import EntTestSubObjectSchema
 from entpy import Field
 from entpy import PrivacyError
-from entpy.framework.ent import EntObjectBase
 from entpy.framework.query import EntObjectQuery
-from entpy.model import APIEntity
-from functools import cache
-from privacy import PrivacyMixin
-from pydantic import Field as APIField
 from sentinels import NOTHING, Sentinel  # type: ignore[import-untyped]
-from sqlalchemy import String
-from sqlalchemy.orm import Mapped, mapped_column
-from typing import TYPE_CHECKING
+from .ent_test_sub_object_models import EntTestSubObjectGen, EntTestSubObjectModel
+from .ent_test_sub_object_models import EntTestSubObjectAPIModel  # noqa: F401
 
 
 privacy_logger = logging.getLogger("entpy.privacy")
 
 
-class EntTestSubObjectModel(EntModel):
-    __tablename__ = "test_sub_object"
-
-    email: Mapped[str] = mapped_column(String(100), nullable=False)
-
-
-class EntTestSubObjectAPIModel(APIEntity):
-    email: str = APIField(..., examples=["vdurmont@gmail.com"])
-
-
-class EntTestSubObject(
-    PrivacyMixin, EntObjectBase[ExampleViewerContext, EntTestSubObjectModel]
-):
-    m = EntTestSubObjectModel
-    schema = EntTestSubObjectSchema()
-
-    if TYPE_CHECKING:
-        email: str
-
-    @classmethod
-    @cache
-    def _get_edge_type(cls, edge_name: str) -> tuple[type[Ent], bool]:
-        return super()._get_edge_type(edge_name)
-
+class EntTestSubObject(EntTestSubObjectGen):
     @classmethod
     def query(cls, vc: ExampleViewerContext) -> EntTestSubObjectQuery:
         return EntTestSubObjectQuery(vc=vc)

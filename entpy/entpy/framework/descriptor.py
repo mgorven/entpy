@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
 
 from entpy.framework.fields.core import Field, FieldWithDefault
+from entpy.gencode.utils import ImportedObject
 
 if TYPE_CHECKING:
     from entpy.framework.pattern import Pattern
@@ -32,6 +33,9 @@ class Descriptor(ABC):
 
     def get_description(self) -> str:
         return ""
+
+    def get_mixins(self) -> list[ImportedObject]:
+        return []
 
 
 def _sort_fields(fields: list[Field]) -> list[Field]:

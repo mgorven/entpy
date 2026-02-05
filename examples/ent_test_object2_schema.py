@@ -10,6 +10,7 @@ from entpy import (
     Schema,
     StringField,
 )
+from entpy.gencode.utils import ImportedObject
 
 
 class EntTestObject2Schema(Schema):
@@ -21,3 +22,6 @@ class EntTestObject2Schema(Schema):
 
     def get_privacy_config(self, action: Action) -> list[EdgeDelegate | PrivacyRule]:
         return [AllowAll()]
+
+    def get_mixins(self) -> list[ImportedObject]:
+        return [ImportedObject("ent_test_object2_mixin", "EntTestObject2Mixin")]

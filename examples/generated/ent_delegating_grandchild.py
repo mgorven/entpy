@@ -6,7 +6,6 @@ from __future__ import annotations
 import logging
 from entpy import (
     db,
-    Ent,
     generate_uuid,
     Action,
     Decision,
@@ -14,76 +13,22 @@ from entpy import (
 from uuid import UUID
 from datetime import datetime, UTC
 from evc import ExampleViewerContext
-from .ent_model import EntModel
 from ent_delegating_grandchild_schema import EntDelegatingGrandchildSchema
 from entpy import Field
 from entpy import PrivacyError
-from entpy.framework.ent import EntObjectBase
 from entpy.framework.query import EntObjectQuery
-from entpy.model import APIEntity
-from functools import cache
-from privacy import PrivacyMixin
-from pydantic import Field as APIField
 from sentinels import NOTHING, Sentinel  # type: ignore[import-untyped]
-from sqlalchemy import ForeignKey
-from sqlalchemy import String
-from sqlalchemy import UUID as DBUUID
-from sqlalchemy.orm import Mapped, mapped_column
-from sqlalchemy.orm import relationship
-from typing import TYPE_CHECKING
+from .ent_delegating_grandchild_models import (
+    EntDelegatingGrandchildGen,
+    EntDelegatingGrandchildModel,
+)
+from .ent_delegating_grandchild_models import EntDelegatingGrandchildAPIModel  # noqa: F401
 
-if TYPE_CHECKING:
-    from .ent_delegating_child import EntDelegatingChildModel
-    from .ent_delegating_child import EntDelegatingChildAPIModel
-    from .ent_delegating_child import EntDelegatingChild
 
 privacy_logger = logging.getLogger("entpy.privacy")
 
 
-class EntDelegatingGrandchildModel(EntModel):
-    __tablename__ = "delegating_grandchild"
-
-    delegating_child_id: Mapped[UUID] = mapped_column(
-        DBUUID(),
-        ForeignKey("delegating_child.id", deferrable=True, initially="DEFERRED"),
-        nullable=False,
-    )
-    name: Mapped[str] = mapped_column(String(100), nullable=False)
-    delegating_child: Mapped["EntDelegatingChildModel"] = relationship(
-        "EntDelegatingChildModel",
-        primaryjoin="EntDelegatingGrandchildModel.delegating_child_id == EntDelegatingChildModel.id",
-    )
-
-
-class EntDelegatingGrandchildAPIModel(APIEntity):
-    delegating_child: "EntDelegatingChildAPIModel" = APIField(...)
-    name: str = APIField(..., examples=["Delegating Grandchild"])
-
-
-class EntDelegatingGrandchild(
-    PrivacyMixin, EntObjectBase[ExampleViewerContext, EntDelegatingGrandchildModel]
-):
-    m = EntDelegatingGrandchildModel
-    schema = EntDelegatingGrandchildSchema()
-
-    if TYPE_CHECKING:
-        delegating_child_id: UUID
-        name: str
-
-        async def gen_delegating_child(self) -> "EntDelegatingChild":
-            pass
-
-    @classmethod
-    @cache
-    def _get_edge_type(cls, edge_name: str) -> tuple[type[Ent], bool]:
-        match edge_name:
-            case "delegating_child":
-                from .ent_delegating_child import EntDelegatingChild
-
-                return (EntDelegatingChild, False)
-
-        return super()._get_edge_type(edge_name)
-
+class EntDelegatingGrandchild(EntDelegatingGrandchildGen):
     @classmethod
     def query(cls, vc: ExampleViewerContext) -> EntDelegatingGrandchildQuery:
         return EntDelegatingGrandchildQuery(vc=vc)

@@ -10,6 +10,7 @@ from generated.ent_test_object import (
     EntTestObjectExample,
 )
 from generated.ent_test_sub_object import EntTestSubObject  # noqa: F401
+from generated.ent_test_object2 import EntTestObject2Example
 
 
 async def test_ent_test_object_gen_with_existing_model(
@@ -158,3 +159,8 @@ async def test_genx_with_invalid_string_id(vc: ExampleViewerContext) -> None:
     """Test that genx raises ValidationError for invalid UUID strings."""
     with pytest.raises(ValidationError, match="Invalid ID format"):
         await EntTestObject.genx(vc, "not-a-valid-uuid")
+
+
+async def test_mixin_methods_are_available(vc: ExampleViewerContext) -> None:
+    ent = await EntTestObject2Example.gen_create(vc, some_field="hello")
+    assert ent.some_field_upper() == "HELLO"

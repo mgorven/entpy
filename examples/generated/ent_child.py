@@ -6,7 +6,6 @@ from __future__ import annotations
 import logging
 from entpy import (
     db,
-    Ent,
     generate_uuid,
     Action,
     Decision,
@@ -14,73 +13,19 @@ from entpy import (
 from uuid import UUID
 from datetime import datetime, UTC
 from evc import ExampleViewerContext
-from .ent_model import EntModel
 from ent_child_schema import EntChildSchema
 from entpy import Field
 from entpy import PrivacyError
-from entpy.framework.ent import EntObjectBase
 from entpy.framework.query import EntObjectQuery
-from entpy.model import APIEntity
-from functools import cache
-from privacy import PrivacyMixin
-from pydantic import Field as APIField
 from sentinels import NOTHING, Sentinel  # type: ignore[import-untyped]
-from sqlalchemy import ForeignKey
-from sqlalchemy import String
-from sqlalchemy import UUID as DBUUID
-from sqlalchemy.orm import Mapped, mapped_column
-from sqlalchemy.orm import relationship
-from typing import TYPE_CHECKING
+from .ent_child_models import EntChildGen, EntChildModel
+from .ent_child_models import EntChildAPIModel  # noqa: F401
 
-if TYPE_CHECKING:
-    from .ent_parent import EntParentModel
-    from .ent_parent import EntParentAPIModel
-    from .ent_parent import EntParent
 
 privacy_logger = logging.getLogger("entpy.privacy")
 
 
-class EntChildModel(EntModel):
-    __tablename__ = "child"
-
-    name: Mapped[str] = mapped_column(String(100), nullable=False)
-    parent_id: Mapped[UUID] = mapped_column(
-        DBUUID(),
-        ForeignKey("parent.id", deferrable=True, initially="DEFERRED"),
-        nullable=False,
-    )
-    parent: Mapped["EntParentModel"] = relationship(
-        "EntParentModel", primaryjoin="EntChildModel.parent_id == EntParentModel.id"
-    )
-
-
-class EntChildAPIModel(APIEntity):
-    name: str = APIField(..., examples=["Benjamin"])
-    parent: "EntParentAPIModel" = APIField(...)
-
-
-class EntChild(PrivacyMixin, EntObjectBase[ExampleViewerContext, EntChildModel]):
-    m = EntChildModel
-    schema = EntChildSchema()
-
-    if TYPE_CHECKING:
-        name: str
-        parent_id: UUID
-
-        async def gen_parent(self) -> "EntParent":
-            pass
-
-    @classmethod
-    @cache
-    def _get_edge_type(cls, edge_name: str) -> tuple[type[Ent], bool]:
-        match edge_name:
-            case "parent":
-                from .ent_parent import EntParent
-
-                return (EntParent, False)
-
-        return super()._get_edge_type(edge_name)
-
+class EntChild(EntChildGen):
     @classmethod
     def query(cls, vc: ExampleViewerContext) -> EntChildQuery:
         return EntChildQuery(vc=vc)

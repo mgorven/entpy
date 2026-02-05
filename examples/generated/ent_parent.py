@@ -6,7 +6,6 @@ from __future__ import annotations
 import logging
 from entpy import (
     db,
-    Ent,
     generate_uuid,
     Action,
     Decision,
@@ -14,74 +13,19 @@ from entpy import (
 from uuid import UUID
 from datetime import datetime, UTC
 from evc import ExampleViewerContext
-from .ent_model import EntModel
 from ent_parent_schema import EntParentSchema
 from entpy import Field
 from entpy import PrivacyError
-from entpy.framework.ent import EntObjectBase
 from entpy.framework.query import EntObjectQuery
-from entpy.model import APIEntity
-from functools import cache
-from privacy import PrivacyMixin
-from pydantic import Field as APIField
 from sentinels import NOTHING, Sentinel  # type: ignore[import-untyped]
-from sqlalchemy import ForeignKey
-from sqlalchemy import String
-from sqlalchemy import UUID as DBUUID
-from sqlalchemy.orm import Mapped, mapped_column
-from sqlalchemy.orm import relationship
-from typing import TYPE_CHECKING
+from .ent_parent_models import EntParentGen, EntParentModel
+from .ent_parent_models import EntParentAPIModel  # noqa: F401
 
-if TYPE_CHECKING:
-    from .ent_grand_parent import EntGrandParentModel
-    from .ent_grand_parent import EntGrandParentAPIModel
-    from .ent_grand_parent import EntGrandParent
 
 privacy_logger = logging.getLogger("entpy.privacy")
 
 
-class EntParentModel(EntModel):
-    __tablename__ = "parent"
-
-    grand_parent_id: Mapped[UUID] = mapped_column(
-        DBUUID(),
-        ForeignKey("grand_parent.id", deferrable=True, initially="DEFERRED"),
-        nullable=False,
-    )
-    name: Mapped[str] = mapped_column(String(100), nullable=False)
-    grand_parent: Mapped["EntGrandParentModel"] = relationship(
-        "EntGrandParentModel",
-        primaryjoin="EntParentModel.grand_parent_id == EntGrandParentModel.id",
-    )
-
-
-class EntParentAPIModel(APIEntity):
-    grand_parent: "EntGrandParentAPIModel" = APIField(...)
-    name: str = APIField(..., examples=["Vincent"])
-
-
-class EntParent(PrivacyMixin, EntObjectBase[ExampleViewerContext, EntParentModel]):
-    m = EntParentModel
-    schema = EntParentSchema()
-
-    if TYPE_CHECKING:
-        grand_parent_id: UUID
-        name: str
-
-        async def gen_grand_parent(self) -> "EntGrandParent":
-            pass
-
-    @classmethod
-    @cache
-    def _get_edge_type(cls, edge_name: str) -> tuple[type[Ent], bool]:
-        match edge_name:
-            case "grand_parent":
-                from .ent_grand_parent import EntGrandParent
-
-                return (EntGrandParent, False)
-
-        return super()._get_edge_type(edge_name)
-
+class EntParent(EntParentGen):
     @classmethod
     def query(cls, vc: ExampleViewerContext) -> EntParentQuery:
         return EntParentQuery(vc=vc)

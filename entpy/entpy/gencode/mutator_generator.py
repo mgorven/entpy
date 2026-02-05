@@ -1,5 +1,6 @@
 from entpy import Schema
 from entpy.framework.fields.core import Field, FieldWithDefault
+from entpy.gencode.base_generator import generate_field_imports
 from entpy.gencode.generated_content import GeneratedContent
 from entpy.gencode.utils import ImportedObject
 from entpy.gencode.utils import to_snake_case as _to_snake_case
@@ -31,6 +32,7 @@ def _generate_base(
 ) -> GeneratedContent:
     # Build up the list of arguments the create function takes
     arguments_definition = ""
+    imports = generate_field_imports(schema)
     for field in schema.get_all_fields():
         or_not = ""
         if field.nullable:
@@ -60,6 +62,7 @@ def _generate_base(
     )
 
     return GeneratedContent(
+        imports=imports,
         code=f"""
 class {base_name}Mutator:
     @classmethod

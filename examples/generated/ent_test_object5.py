@@ -6,7 +6,6 @@ from __future__ import annotations
 import logging
 from entpy import (
     db,
-    Ent,
     generate_uuid,
     Action,
     Decision,
@@ -14,55 +13,19 @@ from entpy import (
 from uuid import UUID
 from datetime import datetime, UTC
 from evc import ExampleViewerContext
-from .ent_model import EntModel
 from ent_test_object5_schema import EntTestObject5Schema
 from entpy import Field
 from entpy import PrivacyError
-from entpy.framework.ent import EntObjectBase
 from entpy.framework.query import EntObjectQuery
-from entpy.model import APIEntity
-from functools import cache
-from privacy import PrivacyMixin
-from pydantic import Field as APIField
 from sentinels import NOTHING, Sentinel  # type: ignore[import-untyped]
-from sqlalchemy import Boolean
-from sqlalchemy import String
-from sqlalchemy.orm import Mapped, mapped_column
-from typing import TYPE_CHECKING
+from .ent_test_object5_models import EntTestObject5Gen, EntTestObject5Model
+from .ent_test_object5_models import EntTestObject5APIModel  # noqa: F401
 
 
 privacy_logger = logging.getLogger("entpy.privacy")
 
 
-class EntTestObject5Model(EntModel):
-    __tablename__ = "test_object5"
-
-    obj5_field: Mapped[str] = mapped_column(String(100), nullable=False)
-    is_it_true: Mapped[bool] = mapped_column(
-        Boolean(), nullable=False, server_default="true"
-    )
-
-
-class EntTestObject5APIModel(APIEntity):
-    obj5_field: str = APIField(..., examples=["blah!"])
-    is_it_true: bool = APIField(True)
-
-
-class EntTestObject5(
-    PrivacyMixin, EntObjectBase[ExampleViewerContext, EntTestObject5Model]
-):
-    m = EntTestObject5Model
-    schema = EntTestObject5Schema()
-
-    if TYPE_CHECKING:
-        obj5_field: str
-        is_it_true: bool
-
-    @classmethod
-    @cache
-    def _get_edge_type(cls, edge_name: str) -> tuple[type[Ent], bool]:
-        return super()._get_edge_type(edge_name)
-
+class EntTestObject5(EntTestObject5Gen):
     @classmethod
     def query(cls, vc: ExampleViewerContext) -> EntTestObject5Query:
         return EntTestObject5Query(vc=vc)

@@ -6,7 +6,6 @@ from __future__ import annotations
 import logging
 from entpy import (
     db,
-    Ent,
     generate_uuid,
     Action,
     Decision,
@@ -14,72 +13,19 @@ from entpy import (
 from uuid import UUID
 from datetime import datetime, UTC
 from evc import ExampleViewerContext
-from .ent_model import EntModel
 from ent_test_object4_schema import EntTestObject4Schema
 from entpy import Field
 from entpy import PrivacyError
-from entpy.framework.ent import EntObjectBase
 from entpy.framework.query import EntObjectQuery
-from entpy.model import APIEntity
-from functools import cache
-from privacy import PrivacyMixin
-from pydantic import Field as APIField
 from sentinels import Sentinel  # type: ignore[import-untyped]
-from sqlalchemy import ForeignKey
-from sqlalchemy import UUID as DBUUID
-from sqlalchemy.orm import Mapped, mapped_column
-from sqlalchemy.orm import relationship
-from typing import TYPE_CHECKING
+from .ent_test_object4_models import EntTestObject4Gen, EntTestObject4Model
+from .ent_test_object4_models import EntTestObject4APIModel  # noqa: F401
 
-if TYPE_CHECKING:
-    from .ent_test_object3 import EntTestObject3Model
-    from .ent_test_object3 import EntTestObject3APIModel
-    from .ent_test_object3 import EntTestObject3
 
 privacy_logger = logging.getLogger("entpy.privacy")
 
 
-class EntTestObject4Model(EntModel):
-    __tablename__ = "test_object4"
-
-    other_id: Mapped[UUID | None] = mapped_column(
-        DBUUID(),
-        ForeignKey("test_object3.id", deferrable=True, initially="DEFERRED"),
-        nullable=True,
-    )
-    other: Mapped["EntTestObject3Model"] = relationship(
-        "EntTestObject3Model",
-        primaryjoin="EntTestObject4Model.other_id == EntTestObject3Model.id",
-    )
-
-
-class EntTestObject4APIModel(APIEntity):
-    other: "EntTestObject3APIModel | None" = APIField(None)
-
-
-class EntTestObject4(
-    PrivacyMixin, EntObjectBase[ExampleViewerContext, EntTestObject4Model]
-):
-    m = EntTestObject4Model
-    schema = EntTestObject4Schema()
-
-    if TYPE_CHECKING:
-        other_id: UUID | None
-
-        async def gen_other(self) -> "EntTestObject3" | None:
-            pass
-
-    @classmethod
-    @cache
-    def _get_edge_type(cls, edge_name: str) -> tuple[type[Ent], bool]:
-        match edge_name:
-            case "other":
-                from .ent_test_object3 import EntTestObject3
-
-                return (EntTestObject3, True)
-
-        return super()._get_edge_type(edge_name)
-
+class EntTestObject4(EntTestObject4Gen):
     @classmethod
     def query(cls, vc: ExampleViewerContext) -> EntTestObject4Query:
         return EntTestObject4Query(vc=vc)
