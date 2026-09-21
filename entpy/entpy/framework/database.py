@@ -11,7 +11,7 @@ from sqlalchemy import event, func
 from sqlalchemy.exc import InterfaceError
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine, AsyncSession
 from sqlalchemy.ext.asyncio.scoping import async_scoped_session
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, SessionTransaction
 
 from entpy.framework.descriptor import Descriptor
 
@@ -73,16 +73,15 @@ async def emulate_for_update(
     yield
 
 
-def release_locks(session: Session) -> None:
-    if "for_update" in session.info:
+def release_locks(session: Session, transaction: SessionTransaction) -> None:
+    if transaction.parent is None and "for_update" in session.info:
         log.debug("Releasing locks %s", session.info["for_update"])
         for lock in session.info["for_update"]:
             lock.release()
         del session.info["for_update"]
 
 
-event.listen(Session, "after_commit", release_locks)
-event.listen(Session, "after_rollback", release_locks)
+event.listen(Session, "after_transaction_end", release_locks)
 
 
 class DatabaseEvents(ABC):
